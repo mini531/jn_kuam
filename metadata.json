@@ -1,0 +1,7 @@
+{
+  "name": "K-UAM Control System",
+  "description": "A high-performance UAM (Urban Air Mobility) management dashboard for Jeollanam-do, South Korea, featuring real-time drone tracking, curved flight paths, weather radar, and realistic restricted zones.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

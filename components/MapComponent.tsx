@@ -32,7 +32,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
     if (!mapRef.current) {
       mapRef.current = L.map('map', {
         center: JEOLLANAMDO_CENTER,
-        zoom: 7, // 전국 섹터를 더 잘 보기 위해 초기 줌 축소
+        zoom: 7,
         zoomControl: false,
         attributionControl: false
       });
@@ -59,17 +59,16 @@ const MapComponent: React.FC<MapComponentProps> = ({
           .addTo(layerGroupsRef.current.wp);
       });
 
-      // FIR Sectors Rendering (이미지 기반 비정형 다각형)
+      // FIR Sectors Rendering
       DETAILED_SECTORS.forEach(sec => {
         const poly = L.polygon(sec.path as any, {
           color: (sec as any).isMainBoundary ? '#ff4757' : sec.color,
-          weight: (sec as any).isMainBoundary ? 3.5 : 1.5, // 주요 경계는 더 굵게
+          weight: (sec as any).isMainBoundary ? 3.5 : 1.5,
           fill: false,
           opacity: 0.9,
           dashArray: (sec as any).isMainBoundary ? '12, 12' : ((sec as any).isDashed ? '6, 10' : '')
         }).addTo(layerGroupsRef.current.sectors);
 
-        // 섹터 명칭 라벨링 (중앙 배치)
         poly.bindTooltip(sec.name, {
           permanent: true,
           direction: 'center',
@@ -216,20 +215,37 @@ const MapComponent: React.FC<MapComponentProps> = ({
       const nextIdx = Math.min(idx + 1, f.path.length - 1);
       const p1 = f.path[idx];
       const p2 = f.path[nextIdx];
-      const angle = (Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) * 180 / Math.PI + 90);
+      
+      // 기체 비행 방향 계산 (Bearing)
+      // Math.atan2(lng_diff, lat_diff)는 북쪽 기준(0도) 시계방향 각도를 반환함
+      // SVG 아이콘이 위쪽(North)을 바라보게 그려져 있으므로 별도의 오프셋 없이 적용
+      let angle = 0;
+      if (p2[0] !== p1[0] || p2[1] !== p1[1]) {
+        angle = (Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) * 180 / Math.PI);
+      }
 
+      // 유인 UAM (eVTOL) 스타일 아이콘 디자인
       const droneHtml = `
         <div style="transform: rotate(${angle}deg); transition: transform 0.1s linear;">
-          <svg viewBox="0 0 100 100" width="40" height="40" style="filter: drop-shadow(0 0 5px ${color});">
-            <path d="M40 50 L60 50 M50 40 L50 60" stroke="${color}" stroke-width="4" stroke-linecap="round"/>
-            <circle cx="50" cy="50" r="8" fill="#080a0c" stroke="${color}" stroke-width="2"/>
-            <line x1="30" y1="30" x2="70" y2="70" stroke="${color}" stroke-width="3" />
-            <line x1="70" y1="30" x2="30" y2="70" stroke="${color}" stroke-width="3" />
-            <g class="prop-spin" style="transform-origin: 30px 30px;"><rect x="20" y="28" width="20" height="4" fill="white" opacity="0.6" rx="2"/></g>
-            <g class="prop-spin" style="transform-origin: 70px 30px;"><rect x="60" y="28" width="20" height="4" fill="white" opacity="0.6" rx="2"/></g>
-            <g class="prop-spin" style="transform-origin: 30px 70px;"><rect x="20" y="68" width="20" height="4" fill="white" opacity="0.6" rx="2"/></g>
-            <g class="prop-spin" style="transform-origin: 70px 70px;"><rect x="60" y="68" width="20" height="4" fill="white" opacity="0.6" rx="2"/></g>
-            ${f.status === FlightStatus.CONFLICT ? '<circle cx="50" cy="50" r="35" fill="none" stroke="#ff00ff" stroke-width="2" class="animate-ping" />' : ''}
+          <svg viewBox="0 0 100 100" width="54" height="54" style="filter: drop-shadow(0 0 8px ${color});">
+            <!-- 기체 날개/암 구조 -->
+            <path d="M15 45 L85 45 M25 70 L75 70" stroke="${color}" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+            <path d="M50 30 L15 45 M50 30 L85 45 M50 80 L25 70 M50 80 L75 70" stroke="${color}" stroke-width="1.5" opacity="0.3"/>
+            
+            <!-- 캐빈 (Fuselage) -->
+            <path d="M40 30 C40 20, 60 20, 60 30 L60 75 C60 85, 40 85, 40 75 Z" fill="#080a0c" stroke="${color}" stroke-width="3"/>
+            <!-- 윈드쉴드 (조종석 부분 - 위쪽이 전면임이 명확하도록 강조) -->
+            <path d="M43 32 C43 28, 57 28, 57 32 L57 48 C57 52, 43 52, 43 48 Z" fill="${color}" fill-opacity="0.5"/>
+            <!-- 꼬리 핀 (방향성 강조) -->
+            <path d="M50 75 L50 88" stroke="${color}" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+
+            <!-- 4개 로터 (Spinning Props) -->
+            <g class="prop-spin" style="transform-origin: 15px 45px;"><rect x="5" y="43" width="20" height="4" fill="white" opacity="0.7" rx="2"/></g>
+            <g class="prop-spin" style="transform-origin: 85px 45px;"><rect x="75" y="43" width="20" height="4" fill="white" opacity="0.7" rx="2"/></g>
+            <g class="prop-spin" style="transform-origin: 25px 70px;"><rect x="15" y="68" width="20" height="4" fill="white" opacity="0.7" rx="2"/></g>
+            <g class="prop-spin" style="transform-origin: 75px 70px;"><rect x="65" y="68" width="20" height="4" fill="white" opacity="0.7" rx="2"/></g>
+            
+            ${f.status === FlightStatus.CONFLICT ? '<circle cx="50" cy="50" r="42" fill="none" stroke="#ff00ff" stroke-width="2.5" class="animate-ping" />' : ''}
           </svg>
         </div>
       `;
@@ -237,8 +253,8 @@ const MapComponent: React.FC<MapComponentProps> = ({
       const icon = L.divIcon({
         className: 'drone-container',
         html: droneHtml,
-        iconSize: [40, 40],
-        iconAnchor: [20, 20]
+        iconSize: [54, 54],
+        iconAnchor: [27, 27]
       });
 
       if (markersRef.current[f.id]) {
